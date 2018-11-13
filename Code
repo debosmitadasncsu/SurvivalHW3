@@ -6,7 +6,7 @@ library(zoo)
 
 katrina <- read.csv("C:/Users/mdsau/OneDrive/Desktop/IAA/AA 502/Survival Analysis/Data/katrina.csv", 
                     header = TRUE)
-katrina$ID <- 1:nrow(katrina) # ID varaib;e
+katrina$ID <- 1:nrow(katrina) # ID varaible
 
 # fit AFT model
 fit <- survreg(Surv(time = hour, event = reason %in% c(2, 3)) ~ backup + bridgecrane + servo + 
