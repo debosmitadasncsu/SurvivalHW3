@@ -1,0 +1,89 @@
+library(survival)
+library(survminer)
+library(flexsurv)
+library(dplyr)
+library(zoo)
+
+katrina <- read.csv("C:/Users/mdsau/OneDrive/Desktop/IAA/AA 502/Survival Analysis/Data/katrina.csv", 
+                    header = TRUE)
+katrina$ID <- 1:nrow(katrina)
+
+fit <- survreg(Surv(time = hour, event = reason %in% c(2, 3)) ~ backup + bridgecrane + servo + 
+                 trashrack + elevation + slope + age, data = katrina, dist = "weibull")
+summary(fit)
+
+fit2 <- coxph(Surv(time = hour, event = reason %in% c(2, 3)) ~ backup + bridgecrane + servo + 
+               trashrack + elevation + slope + age, data = katrina)
+summary(fit2)
+
+fit2_zph <- cox.zph(fit2, transform = "km")
+
+plot(fit2_zph, var = "backup")
+abline(h = 0, col = "red") # reference line at 0
+abline(h = fit2$coef["backup"], col = "purple", lty = 2, lwd = 2) # model estimate
+
+plot(fit2_zph, var = "bridgecrane")
+abline(h = 0, col = "red") # reference line at 0
+abline(h = fit2$coef["bridgecrane"], col = "purple", lty = 2, lwd = 2) # model estimate
+
+plot(fit2_zph, var = "servo")
+abline(h = 0, col = "red") # reference line at 0
+abline(h = fit2$coef["servo"], col = "purple", lty = 2, lwd = 2) # model estimate
+
+plot(fit2_zph, var = "trashrack")
+abline(h = 0, col = "red") # reference line at 0
+abline(h = fit2$coef["trashrack"], col = "purple", lty = 2, lwd = 2) # model estimate
+
+plot(fit2_zph, var = "elevation")
+abline(h = 0, col = "red") # reference line at 0
+abline(h = fit2$coef["elevation"], col = "purple", lty = 2, lwd = 2) # model estimate
+
+plot(fit2_zph, var = "slope")
+abline(h = 0, col = "red") # reference line at 0
+abline(h = fit2$coef["slope"], col = "purple", lty = 2, lwd = 2) # model estimate
+
+plot(fit2_zph, var = "age")
+abline(h = 0, col = "red") # reference line at 0
+abline(h = fit2$coef["age"], col = "purple", lty = 2, lwd = 2) # model estimate
+
+#initialize empty data frame
+katrina_long <- data.frame(ID = integer(), start = integer(), stop = integer(), survive = integer(), reason = integer(),
+                          hour = integer(), backup = integer(), age = integer(), bridgecrane = integer(), servo = integer(),
+                          gear = integer(), trackrack = integer(), slope = integer(), elevation = integer(), h = integer())
+# for each row in original data set
+for(x in 1:nrow(katrina)) {
+  # initialize start hour
+  i <- 0
+  # initialize stop hour
+  j <- 1
+  # pull the entire row
+  row <- katrina[x,]
+  # while the start hour is less than the death hour
+  while(i < row[,58]){
+    # this tells us what column of h we want to pull
+    hcol <- 9 + i
+    newrow <- data.frame(ID = row[,61], start = i, stop = j, survive = ifelse(j == row[,58],ifelse(row[,58] == 48,1,0),1), reason = row[,59],
+                        hour = row[,58], backup = row[,1], age = row[,2],
+                        bridgecrane = row[,3], servo = row[,4], gear = row[,5],
+                        trashrack = row[,6], slope = row[,7], elevation = row[,8],
+                        pumping = row[,hcol])
+    #add the new row to the long data set
+    katrina_long = rbind(katrina_long,newrow)
+    #increment start and stop hours
+    i <- i + 1
+    j <- j + 1
+  }
+}
+
+katrina_long$pumping[is.na(katrina_long$pumping)] <- 0
+
+katrina_long <- katrina_long %>%
+  arrange(ID,start,stop) %>% 
+  group_by(ID) %>% 
+  mutate(rolling = rollsumr(pumping, k = 12, fill = 0, align = "right")) 
+
+katrina_long$rolling_flag <- ifelse(katrina_long$rolling == 12, 1,0)
+
+fit3 <- coxph(Surv(start, stop, event = reason %in% c(2, 3)) ~ backup + bridgecrane + servo + 
+                trashrack + elevation + slope + age + rolling_flag, data = katrina_long)
+summary(fit3)
