@@ -6,16 +6,19 @@ library(zoo)
 
 katrina <- read.csv("C:/Users/mdsau/OneDrive/Desktop/IAA/AA 502/Survival Analysis/Data/katrina.csv", 
                     header = TRUE)
-katrina$ID <- 1:nrow(katrina)
+katrina$ID <- 1:nrow(katrina) # ID varaib;e
 
+# fit AFT model
 fit <- survreg(Surv(time = hour, event = reason %in% c(2, 3)) ~ backup + bridgecrane + servo + 
                  trashrack + elevation + slope + age, data = katrina, dist = "weibull")
 summary(fit)
 
+# fit cox regression models
 fit2 <- coxph(Surv(time = hour, event = reason %in% c(2, 3)) ~ backup + bridgecrane + servo + 
                trashrack + elevation + slope + age, data = katrina)
 summary(fit2)
 
+# checking all variables for constant effect over time
 fit2_zph <- cox.zph(fit2, transform = "km")
 
 plot(fit2_zph, var = "backup")
@@ -75,15 +78,19 @@ for(x in 1:nrow(katrina)) {
   }
 }
 
+# replace missing values with 0
 katrina_long$pumping[is.na(katrina_long$pumping)] <- 0
 
+# create a rolling window cumulative sum
 katrina_long <- katrina_long %>%
   arrange(ID,start,stop) %>% 
   group_by(ID) %>% 
   mutate(rolling = rollsumr(pumping, k = 12, fill = 0, align = "right")) 
 
+# create flag for times where pump has been running for 12 consecutive hours
 katrina_long$rolling_flag <- ifelse(katrina_long$rolling == 12, 1,0)
 
+# fit final model
 fit3 <- coxph(Surv(start, stop, event = reason %in% c(2, 3)) ~ backup + bridgecrane + servo + 
                 trashrack + elevation + slope + age + rolling_flag, data = katrina_long)
 summary(fit3)
